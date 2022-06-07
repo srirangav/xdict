@@ -7,7 +7,8 @@
 
     History:
 
-    v. 0.1.0 (05/##/2022) - Initial version
+    v. 0.1.0 (06/06/2022) - Initial version
+    v. 0.1.1 (06/07/2022) - remove unneeded prototypes
 
     Copyright (c) 2022 Sriranga R. Veeraraghavan <ranga@calalum.org>
 
@@ -42,23 +43,15 @@
 */
 
 extern CFArrayRef  DCSCopyAvailableDictionaries(void);
-extern CFStringRef DCSDictionaryGetName(DCSDictionaryRef dictionary);
-extern CFStringRef DCSDictionaryGetShortName(DCSDictionaryRef dictionary);
-extern CFArrayRef  DCSCopyRecordsForSearchString(DCSDictionaryRef dictionary,
+extern CFStringRef DCSDictionaryGetName(DCSDictionaryRef dict);
+extern CFStringRef DCSDictionaryGetShortName(DCSDictionaryRef dict);
+extern CFArrayRef  DCSCopyRecordsForSearchString(DCSDictionaryRef dict,
                                                  CFStringRef string,
                                                  void *,
                                                  void *);
 extern CFStringRef DCSRecordCopyData(CFTypeRef record);
-extern CFStringRef DCSRecordCopyDataURL(CFTypeRef record);
-extern CFStringRef DCSRecordGetAnchor(CFTypeRef record);
-extern CFStringRef DCSRecordGetAssociatedObj(CFTypeRef record);
 extern CFStringRef DCSRecordGetHeadword(CFTypeRef record);
 extern CFStringRef DCSRecordGetRawHeadword(CFTypeRef record);
-extern CFStringRef DCSRecordGetString(CFTypeRef record);
-extern CFStringRef DCSRecordGetTitle(CFTypeRef record);
-extern CFDictionaryRef  DCSCopyDefinitionMarkup(DCSDictionaryRef dictionary,
-                                                CFStringRef record);
-extern DCSDictionaryRef DCSRecordGetSubDictionary(CFTypeRef record);
 
 /* prototypes */
 
@@ -100,15 +93,14 @@ static int listDictionaries(void)
 
     /* get all available dictionaries */
 
-    dictList = (__bridge_transfer NSArray *)DCSCopyAvailableDictionaries();
+    dictList = 
+        (__bridge_transfer NSArray *)DCSCopyAvailableDictionaries();
     if (dictList == nil || [dictList count] <= 0)
     {
         return 1;
     }
 
-    dicts =
-        [NSMutableDictionary dictionaryWithCapacity:
-            [dictList count]];
+    dicts = [NSMutableDictionary dictionaryWithCapacity: [dictList count]];
     if (dicts == nil)
     {
         return 1;
@@ -118,8 +110,8 @@ static int listDictionaries(void)
 
     for (dict in dictList)
     {
-        name =
-            (__bridge NSString *)DCSDictionaryGetName((__bridge DCSDictionaryRef)dict);
+        name = (__bridge NSString *)DCSDictionaryGetName(
+            (__bridge DCSDictionaryRef)dict);
         if (name != nil)
         {
             [dicts setObject: dict
@@ -140,9 +132,8 @@ static int listDictionaries(void)
 
     /* sort the dictionary names */
 
-    sortedDictNames =
-        [dictNames sortedArrayUsingSelector:
-            @selector(localizedCaseInsensitiveCompare:)];
+    sortedDictNames = [dictNames sortedArrayUsingSelector:
+        @selector(localizedCaseInsensitiveCompare:)];
     if (sortedDictNames == nil)
     {
         return 1;
@@ -165,8 +156,8 @@ static int listDictionaries(void)
             continue;
         }
 
-        name = 
-            (__bridge NSString *)DCSDictionaryGetShortName((__bridge DCSDictionaryRef)dict);
+        name = (__bridge NSString *)DCSDictionaryGetShortName(
+            (__bridge DCSDictionaryRef)dict);
         if (name != nil &&
             [name caseInsensitiveCompare: dictName] != NSOrderedSame)
         {
@@ -210,17 +201,15 @@ static int printDefinition(const char *rawWord, NSString *dictName)
         return ret;
     }
 
-    wordStr =
-        [[NSString alloc] initWithCString: rawWord
-                                 encoding: NSUTF8StringEncoding];
+    wordStr = [[NSString alloc] initWithCString: rawWord
+                                       encoding: NSUTF8StringEncoding];
     if (wordStr == nil)
     {
         fprintf(stderr,"ERROR: cannot convert '%s'\n", rawWord);
         return ret;
     }
 
-    trimmedWord =
-        [wordStr stringByTrimmingCharactersInSet:
+    trimmedWord = [wordStr stringByTrimmingCharactersInSet:
             [NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (trimmedWord == nil)
     {
@@ -235,15 +224,16 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
     if (dictName == nil)
     {
-        definition =
-            (__bridge_transfer NSString *)DCSCopyTextDefinition(NULL,
-                (__bridge CFStringRef)trimmedWord,
-                CFRangeMake(0, (CFIndex)[trimmedWord length]));
+        definition = (__bridge_transfer NSString *)DCSCopyTextDefinition(
+            NULL,
+            (__bridge CFStringRef)trimmedWord,
+            CFRangeMake(0, (CFIndex)[trimmedWord length]));
         if (definition != nil)
         {
             fprintf(stdout,
                     "%s\n",
-                    [definition cStringUsingEncoding: NSUTF8StringEncoding]);
+                    [definition cStringUsingEncoding: 
+                        NSUTF8StringEncoding]);
             ret = 0;
         }
         return ret;
@@ -251,8 +241,7 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
     /* search in the specified dictionary */
 
-    trimmedDict =
-        [dictName stringByTrimmingCharactersInSet:
+    trimmedDict = [dictName stringByTrimmingCharactersInSet:
             [NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (trimmedDict == nil)
     {
@@ -264,10 +253,11 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
     /* try to find the requested dictionary */
 
-    for (dict in (__bridge_transfer NSArray *)DCSCopyAvailableDictionaries())
+    for (dict in 
+         (__bridge_transfer NSArray *)DCSCopyAvailableDictionaries())
     {
-        name =
-            (__bridge NSString *)DCSDictionaryGetName((__bridge DCSDictionaryRef)dict);
+        name = (__bridge NSString *)DCSDictionaryGetName(
+                (__bridge DCSDictionaryRef)dict);
         if (name == nil)
         {
             continue;
@@ -281,8 +271,8 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
         /* try the short name */
 
-        name =
-            (__bridge NSString *)DCSDictionaryGetShortName((__bridge DCSDictionaryRef)dict);
+        name = (__bridge NSString *)DCSDictionaryGetShortName(
+                (__bridge DCSDictionaryRef)dict);
         if (name == nil)
         {
             continue;
@@ -310,11 +300,11 @@ static int printDefinition(const char *rawWord, NSString *dictName)
         requested dictionary
     */
 
-    records =
-        (__bridge_transfer NSArray *)DCSCopyRecordsForSearchString((__bridge DCSDictionaryRef)dict,
-                                                                   (__bridge CFStringRef)trimmedWord,
-                                                                   NULL,
-                                                                   NULL);
+    records = (__bridge_transfer NSArray *)DCSCopyRecordsForSearchString(
+            (__bridge DCSDictionaryRef)dict,
+            (__bridge CFStringRef)trimmedWord,
+            NULL,
+            NULL);
     if (records == nil || [records count] <= 0)
     {
         fprintf(stderr,
@@ -327,16 +317,15 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
     for (record in records)
     {
-        title =
-            (__bridge NSString *)DCSRecordGetRawHeadword((__bridge CFTypeRef)record);
+        title = (__bridge NSString *)DCSRecordGetRawHeadword(
+                    (__bridge CFTypeRef)record);
         if (title == nil)
         {
             ret++;
             continue;
         }
 
-        definition =
-            (__bridge_transfer NSString*)DCSCopyTextDefinition(
+        definition = (__bridge_transfer NSString*)DCSCopyTextDefinition(
                 (__bridge DCSDictionaryRef)dict,
                 (__bridge CFStringRef)title,
                 CFRangeMake(0, (CFIndex)[title length]));
@@ -351,7 +340,8 @@ static int printDefinition(const char *rawWord, NSString *dictName)
             fprintf(stdout,
                     "[%2d] %s\n",
                     i,
-                    [definition cStringUsingEncoding: NSUTF8StringEncoding]);
+                    [definition cStringUsingEncoding: 
+                        NSUTF8StringEncoding]);
             i++;
         }
         
@@ -402,8 +392,9 @@ int main(int argc, char * const argv[])
                 }
                 else
                 {
-                    dict = [[NSString alloc] initWithCString: optarg
-                                                    encoding: NSUTF8StringEncoding];
+                    dict = [[NSString alloc]
+                        initWithCString: optarg
+                               encoding: NSUTF8StringEncoding];
                 }
 
                 break;
@@ -465,3 +456,4 @@ int main(int argc, char * const argv[])
 
     } /* @autoreleasepool */
 }
+
