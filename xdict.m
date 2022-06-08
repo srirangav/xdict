@@ -3,12 +3,14 @@
 
     Inspired by: https://nshipster.com/dictionary-services/
                  https://github.com/mchinen/RSDeskDict/blob/master/RSDeskDict/AppDelegate.m
+                 https://stackoverflow.com/questions/22580539/
                  https://9fans.github.io/plan9port/man/man1/dict.html
 
     History:
 
     v. 0.1.0 (06/06/2022) - Initial version
     v. 0.1.1 (06/07/2022) - remove unneeded prototypes
+    v. 0.2.0 (06/08/2022) - add support for commands and format definitions
 
     Copyright (c) 2022 Sriranga R. Veeraraghavan <ranga@calalum.org>
 
@@ -36,6 +38,7 @@
 #import <CoreServices/CoreServices.h>
 #import <stdio.h>
 #import <unistd.h>
+#import <strings.h>
 
 /*
     Dictionary Services API
@@ -53,35 +56,115 @@ extern CFStringRef DCSRecordCopyData(CFTypeRef record);
 extern CFStringRef DCSRecordGetHeadword(CFTypeRef record);
 extern CFStringRef DCSRecordGetRawHeadword(CFTypeRef record);
 
-/* prototypes */
+/* xdict options */
 
-static void printUsage(void);
-static int  listDictionaries(void);
-static int  printDefinition(const char *word, NSString *dict);
+typedef struct
+{
+    bool headwordOnly;
+    bool html;
+    bool raw;
+} xdictOpts_t;
 
 /* globals */
 
 enum
 {
+    gPgmOptCmd      = 'c',
     gPgmOptDict     = 'd',
     gPgmOptHelp     = 'h',
     gPgmOptList     = 'l',
 };
 
-static const char *gPgmOpts = "d:hl";
+static const char *gPgmOpts = "c:d:hl";
 static const char *gPgmName = "xdict";
 static const char *gPgmOptListDicts = "?";
+
+/* commands */
+
+static const char *gPgmCmdHeadwordLong = "headword";
+static const char *gPgmCmdHeadwordShort = "h";
+static const char *gPgmCmdHtmlLong = "html";
+static const char *gPgmCmdHtmlShort = "m";
+static const char *gPgmCmdRawLong = "raw";
+static const char *gPgmCmdRawShort = "r";
+
+/* prototypes */
+
+static void printUsage(void);
+static bool isArg(const char *arg,
+                  const char *longMode,
+                  const char *shortMode);
+static int  listDictionaries(void);
+static int  printDefinition(const char *word,
+                            NSString *dict,
+                            xdictOpts_t *opts);
+static void printFormattedDefinition(NSString *definition);
+
+/* printUsage - print the usage message */
 
 static void printUsage(void)
 {
     fprintf(stderr,
-            "Usage: %s [-%c] | [-%c [dictionary]] [word]\n",
+            "Usage: %s [-%c] | [-%c [dictionary] [-%c [command]] [word]\n",
             gPgmName,
             gPgmOptList,
-            gPgmOptDict);
+            gPgmOptDict,
+            gPgmOptCmd);
 }
 
-/* listDictionaries - list all available dictionaries */
+/* isArg - check if the arg is the requested mode */
+
+static bool isArg(const char *arg,
+           const char *longMode,
+           const char *shortMode)
+{
+    size_t modeStrLen = 0;
+
+    if (arg == NULL || arg[0] == '\0')
+    {
+        return false;
+    }
+
+    if (longMode != NULL)
+    {
+        modeStrLen = strlen(longMode);
+        if (modeStrLen > 1 &&
+            strncasecmp(arg, longMode, modeStrLen) == 0)
+        {
+            if (strlen(arg) == modeStrLen)
+            {
+                return true;
+            }
+            return false;
+        }
+    }
+
+    if (shortMode == NULL)
+    {
+        return false;
+    }
+
+    modeStrLen = strlen(shortMode);
+    if (modeStrLen < 1)
+    {
+        return false;
+    }
+
+    if (strncasecmp(arg, shortMode, modeStrLen) == 0 &&
+        strlen(arg) == modeStrLen)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+
+/* 
+    listDictionaries - list all available dictionaries
+
+    TODO: Use short names for sorting before long names
+*/
 
 static int listDictionaries(void)
 {
@@ -93,7 +176,7 @@ static int listDictionaries(void)
 
     /* get all available dictionaries */
 
-    dictList = 
+    dictList =
         (__bridge_transfer NSArray *)DCSCopyAvailableDictionaries();
     if (dictList == nil || [dictList count] <= 0)
     {
@@ -180,25 +263,186 @@ static int listDictionaries(void)
     return 0;
 }
 
+/* printFormattedDefinition - format and print a definition */
+
+static void printFormattedDefinition(NSString *definition)
+{
+    NSMutableString *formattedDef = nil;
+
+    if (definition == nil)
+    {
+        return;
+    }
+
+    formattedDef = 
+        [[definition stringByReplacingOccurrencesOfString: @" 1 "
+                                               withString: @"\n  1 "]
+        mutableCopy];
+
+    if (formattedDef == nil)
+    {
+        fprintf(stdout,
+                "%s\n",
+                [definition cStringUsingEncoding: NSUTF8StringEncoding]);
+        return;
+    }
+
+
+    if (@available(macos 10.7, *))
+    {
+        NSError *error = nil;
+        NSRegularExpression *regex = [NSRegularExpression 
+            regularExpressionWithPattern: @"([▸•●] )"
+                                 options: 0
+                                   error: &error];
+        if (regex != nil)
+        {
+            [regex replaceMatchesInString: formattedDef
+                                  options: NSMatchingWithTransparentBounds
+                                    range: NSMakeRange(0, 
+                                           [formattedDef length])
+                             withTemplate: @"\n    $1"];
+        }
+
+        regex = [NSRegularExpression 
+            regularExpressionWithPattern: 
+    //                                    @"([\\)\\.]+)\\s+(\\d+)\\s"
+                @"\\s+(\\d+\\s[\\[\\[\\(])"
+                                 options: 0
+                                   error: &error];
+        if (regex != nil)
+        {
+            [regex replaceMatchesInString: formattedDef
+                                  options: 
+                                  NSMatchingWithTransparentBounds
+                                    range: NSMakeRange(0, 
+                                           [formattedDef length])
+                             withTemplate: @"\n  $1"];
+        }
+
+        regex = [NSRegularExpression 
+            regularExpressionWithPattern: @"(\\D)\\.\\s(\\S)"
+                                 options: NSRegularExpressionCaseInsensitive
+                    error: &error];
+        if (regex != nil)
+        {
+            [regex replaceMatchesInString: formattedDef
+                                  options: 
+                                  NSMatchingWithTransparentBounds
+                                    range: NSMakeRange(0, 
+                                           [formattedDef length])
+                             withTemplate: @"$1.\n  $2"];
+        }
+
+        regex = [NSRegularExpression 
+            regularExpressionWithPattern: @"Word Links sections.*\\."
+                                 options: 0
+                    error: &error];
+        if (regex != nil)
+        {
+            [regex replaceMatchesInString: formattedDef
+                                  options: 
+                                  NSMatchingWithTransparentBounds
+                                    range: NSMakeRange(0, 
+                                           [formattedDef length])
+                             withTemplate: @"\n"];
+        }
+    }
+
+    [formattedDef replaceOccurrencesOfString: @".verb"
+                                  withString: @".\nverb "
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    [formattedDef replaceOccurrencesOfString: @"PHRASES"
+                                  withString: @"\nPHRASES\n "
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    [formattedDef replaceOccurrencesOfString: @"PHRASAL VERBS"
+                                  withString: @"\nPHRASAL VERBS\n "
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    [formattedDef replaceOccurrencesOfString: @"DERIVATIVES"
+                                  withString: @"\nDERIVATIVES\n "
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    [formattedDef replaceOccurrencesOfString: @"ORIGIN"
+                                  withString: @"\nORIGIN\n "
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    [formattedDef replaceOccurrencesOfString: @"IDIOME"
+                                  withString: @"\nIDIOME\n "
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    [formattedDef replaceOccurrencesOfString: @"WORD LINKS"
+                                  withString: @"\nWORD LINKS\n "
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    [formattedDef replaceOccurrencesOfString: @" | )"
+                                  withString: @")"
+                                     options: NSLiteralSearch
+                                       range: NSMakeRange(0, 
+                                       [formattedDef length])];
+
+    fprintf(stdout,
+            "%s\n",
+            [formattedDef cStringUsingEncoding: NSUTF8StringEncoding]);
+}
+
 /*
     printDefinition - print the definition for the given word
                       using the specified dictionary
  */
 
-static int printDefinition(const char *rawWord, NSString *dictName)
+static int printDefinition(const char *rawWord,
+                           NSString *dictName,
+                           xdictOpts_t *opts)
 {
     NSString *wordStr = nil, *trimmedWord = nil;
     NSString *title =  nil, *definition = nil, *prev = nil;
     NSString *trimmedDict = nil, *name = nil;
     NSArray *records = nil;
+    NSUInteger numRecs = 0;
     DCSDictionaryRef dictRef = nil;
     id dict, record;
     int ret = 1, i = 1;
+    bool printHtml = false;
+    bool printHeadword = false;
+    bool printRaw = false;
 
     if (rawWord == NULL || rawWord[0] == '\0')
     {
         fprintf(stderr,"ERROR: no word provided\n");
         return ret;
+    }
+
+    if (opts != NULL)
+    {
+        if (opts->headwordOnly == true)
+        {
+            printHeadword = true;
+        }
+        else if (opts->html == true)
+        {
+            printHtml = true;
+        }
+        else if (opts->raw == true)
+        {
+            printRaw = true;
+        }
     }
 
     wordStr = [[NSString alloc] initWithCString: rawWord
@@ -228,15 +472,8 @@ static int printDefinition(const char *rawWord, NSString *dictName)
             NULL,
             (__bridge CFStringRef)trimmedWord,
             CFRangeMake(0, (CFIndex)[trimmedWord length]));
-        if (definition != nil)
-        {
-            fprintf(stdout,
-                    "%s\n",
-                    [definition cStringUsingEncoding: 
-                        NSUTF8StringEncoding]);
-            ret = 0;
-        }
-        return ret;
+        printFormattedDefinition(definition);
+        return 0;
     }
 
     /* search in the specified dictionary */
@@ -253,7 +490,7 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
     /* try to find the requested dictionary */
 
-    for (dict in 
+    for (dict in
          (__bridge_transfer NSArray *)DCSCopyAvailableDictionaries())
     {
         name = (__bridge NSString *)DCSDictionaryGetName(
@@ -305,14 +542,23 @@ static int printDefinition(const char *rawWord, NSString *dictName)
             (__bridge CFStringRef)trimmedWord,
             NULL,
             NULL);
-    if (records == nil || [records count] <= 0)
+    if (records == nil)
     {
         fprintf(stderr,
                 "ERROR:  no definitions found for '%s'\n",
                 rawWord);
         return ret;
     }
-    
+
+    numRecs = [records count];
+    if (numRecs <= 0)
+    {
+        fprintf(stderr,
+                "ERROR:  no definitions found for '%s'\n",
+                rawWord);
+        return ret;
+    }
+
     ret = 0;
 
     for (record in records)
@@ -325,10 +571,27 @@ static int printDefinition(const char *rawWord, NSString *dictName)
             continue;
         }
 
-        definition = (__bridge_transfer NSString*)DCSCopyTextDefinition(
-                (__bridge DCSDictionaryRef)dict,
-                (__bridge CFStringRef)title,
-                CFRangeMake(0, (CFIndex)[title length]));
+        if (printHeadword)
+        {
+            fprintf(stdout,
+                    "%s\n",
+                    [title cStringUsingEncoding: NSUTF8StringEncoding]);
+            break;
+        }
+
+        if (printHtml)
+        {
+            definition = (__bridge_transfer NSString*)DCSRecordCopyData(
+                    (__bridge CFTypeRef)record);
+        }
+        else
+        {
+            definition = (__bridge_transfer NSString*)DCSCopyTextDefinition(
+                    (__bridge DCSDictionaryRef)dict,
+                    (__bridge CFStringRef)title,
+                    CFRangeMake(0, (CFIndex)[title length]));
+        }
+
         if (definition == nil)
         {
             ret++;
@@ -337,14 +600,25 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
         if (prev == nil || ![prev isEqualToString: definition])
         {
-            fprintf(stdout,
-                    "[%2d] %s\n",
-                    i,
-                    [definition cStringUsingEncoding: 
-                        NSUTF8StringEncoding]);
+            if (printHtml == false && printRaw == false && numRecs > 1)
+            {
+                fprintf(stdout, "[%2d] ", i);
+            }
+
+            if (printRaw == true)
+            {
+                fprintf(stdout,
+                        "%s\n",
+                        [definition cStringUsingEncoding:
+                            NSUTF8StringEncoding]);
+            }
+            else
+            {
+                printFormattedDefinition(definition);
+            }
             i++;
         }
-        
+
         prev = definition;
     }
 
@@ -355,10 +629,10 @@ static int printDefinition(const char *rawWord, NSString *dictName)
 
 int main(int argc, char * const argv[])
 {
-
     int err = 0, ch = 0;
     BOOL optList = NO, optHelp = NO;
     NSString *dict = nil;
+    xdictOpts_t opts;
 
 @autoreleasepool
     {
@@ -369,7 +643,11 @@ int main(int argc, char * const argv[])
         return 1;
     }
 
-     while ((ch = getopt(argc, argv, gPgmOpts)) != -1)
+    opts.headwordOnly = false;
+    opts.html = false;
+    opts.raw = false;
+
+    while ((ch = getopt(argc, argv, gPgmOpts)) != -1)
     {
         switch(ch)
         {
@@ -379,6 +657,42 @@ int main(int argc, char * const argv[])
             case gPgmOptList:
                 optList = YES;
                 break;
+            case gPgmOptCmd:
+
+                if (optarg[0] == '\0')
+                {
+                    fprintf(stderr,"Error: No command specified\n");
+                    err++;
+                }
+                else if (isArg(optarg,
+                               gPgmCmdHeadwordLong,
+                               gPgmCmdHeadwordShort) == true)
+                {
+                    opts.headwordOnly = true;
+                }
+                else if (isArg(optarg,
+                               gPgmCmdHtmlLong,
+                               gPgmCmdHtmlShort) == true)
+                {
+                    opts.html = true;
+                    opts.raw = false;
+                }
+                else if (isArg(optarg,
+                               gPgmCmdRawLong,
+                               gPgmCmdRawShort) == true)
+                {
+                    opts.raw = true;
+                    opts.html = false;
+                }
+                else
+                {
+                    fprintf(stderr,
+                            "Error: Unknown command: '%s'\n",
+                            optarg);
+                    err++;
+                }
+                break;
+
             case gPgmOptDict:
 
                 if (optarg[0] == '\0')
@@ -452,8 +766,7 @@ int main(int argc, char * const argv[])
         return 1;
     }
 
-    return printDefinition(argv[0], dict);
+    return printDefinition(argv[0], dict, &opts);
 
     } /* @autoreleasepool */
 }
-

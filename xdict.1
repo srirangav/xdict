@@ -1,0 +1,30 @@
+.TH xdict 1
+.SH NAME
+xdict \- a command line program for accessing the MacOSX dictionary
+.SH SYNOPSIS
+ xdict [\-l] | [\-d [dictionary] [\-c [command]] [word]
+.SH DESCRIPTION
+xdict is a MacOSX command line program for accessing the MacOSX 
+dictionary. 
+.SH OPTIONS
+.TP
+.B \-l
+If \-l is specified, all available dictionaries are listed.
+.TP
+.B \-d [dictionary]
+If \-d is specified, xdict will try to use the specified dictionary,
+if it is available.
+.TP
+.B \-c [command]
+If \-c is specified, xdict will execute one of the following commands:
+.br
+.br
+"h" or "headword" \- prints the headword only
+.br
+"m" or "html"     \- prints the html version of the defintion
+.br
+"r" or "raw"      \- prints the raw version of the definition
+.SH PLATFORMS
+xdict has been tested on MacOSX 11.x (BigSur) on M1.
+.SH HISTORY
+xdict was written by Sriranga Veeraraghavan <ranga@calalum.org>.

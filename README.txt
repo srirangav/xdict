@@ -1,7 +1,7 @@
 README
 ------
 
-xdict v0.1.0
+xdict v0.2.0
 
 Homepage:
 
@@ -14,12 +14,23 @@ dictionary.
 
 Usage:
 
-    xdict [-l] | [-d [dictionary]] [word]
+    xdict [-l] | [-d [dictionary] [-c [command]] [word]
 
     If -l is specified, xdict lists all available dictionaries.
 
     If -d is specified, xdict will try to use the specified
     [dictionary] to look up the specified [word]. 
+
+    if -c is specified, xdict will execute one of the following
+    commands:
+
+    'h' or 'headword' - prints the headword only
+    'm' or 'html'     - prints the html version of the defintion
+    'r' or 'raw'      - prints the raw version of the definition
+                        (by default xdict tries to format the 
+                         definition)
+
+    The -c option is ignored unless -d is also specified.
 
 Build:
 
@@ -60,6 +71,7 @@ Dependencies:
 
 History:
 
+    v. 0.2.0 - add commands and format definitions
     v. 0.1.0 - initial release
 
 Platforms:

@@ -1,7 +1,7 @@
 dnl -*- Autoconf -*-
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([xdict],[0.1.0],[ranga@calalum.org])
+AC_INIT([xdict],[0.2.0],[ranga@calalum.org])
 
 # We want to turn on warnings if we are using gcc and the user did 
 # not specify CFLAGS. The autoconf check for the C compiler sets the
@@ -32,6 +32,19 @@ AC_CONFIG_SRCDIR(["$PGM_SRCS"])
 
 AC_C_CONST
 
+# check for objc ARC is available
+
+AC_MSG_CHECKING([for Objective-C ARC])
+save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -fobjc-arc"
+AC_LINK_IFELSE([AC_LANG_PROGRAM([#import <AppKit/AppKit.h>], [])
+                ],[has_framework=1],[has_framework=0])
+if test $has_framework = 0; then
+  AC_MSG_ERROR([ARC is required])
+else
+  AC_MSG_RESULT([yes])
+fi
+
 # check for Dictionary Services in AppKit
 
 AC_MSG_CHECKING([for Dictionary Services in AppKit])
@@ -42,7 +55,7 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([#import <AppKit/AppKit.h>
                 NSArray *d = (__bridge_transfer NSArray *)DCSCopyAvailableDictionaries();])
                 ],[has_framework=1],[has_framework=0])
 if test $has_framework = 0; then
-  AC_MSG_ERROR([AppKit is required])
+  AC_MSG_ERROR([Dictionary Services are required])
 else
   AC_MSG_RESULT([yes])
 fi
@@ -187,7 +200,7 @@ TEST_AND_SET_CFLAG(-fsplit-stack)
 TEST_AND_SET_CFLAG(-fstack-limit-register)
 TEST_AND_SET_CFLAG(-fstack-limit-symbol)
 TEST_AND_SET_CFLAG(-fno-stack-array)
-TEST_AND_SET_CFLAG(-mbranch-protection=standard)
+#TEST_AND_SET_CFLAG(-mbranch-protection=standard)
 
 OBJCFLAGS="$OBJCFLAGS $CFLAGS"
 
