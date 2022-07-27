@@ -4,8 +4,8 @@ xdict \- a command line program for accessing the MacOSX dictionary
 .SH SYNOPSIS
  xdict [\-l] | [\-d [dictionary] [\-c [command]] [word]
 .SH DESCRIPTION
-xdict is a MacOSX command line program for accessing the MacOSX 
-dictionary. 
+xdict is a MacOSX command line program for accessing the MacOSX
+dictionary.
 .SH OPTIONS
 .TP
 .B \-l
@@ -17,13 +17,17 @@ if it is available.
 .TP
 .B \-c [command]
 If \-c is specified, xdict will execute one of the following commands:
-.br
-.br
+.sp
+.ti
 "h" or "headword" \- prints the headword only
-.br
+.ti
 "m" or "html"     \- prints the html version of the defintion
-.br
+.ti
 "r" or "raw"      \- prints the raw version of the definition
+.sp
+.ti
+All commands except 'r' or 'raw' are ignored by the \-c option
+unless \-d is also specified.
 .SH PLATFORMS
 xdict has been tested on MacOSX 11.x (BigSur) on M1.
 .SH HISTORY

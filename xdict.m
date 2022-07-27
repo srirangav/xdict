@@ -11,6 +11,7 @@
     v. 0.1.0 (06/06/2022) - Initial version
     v. 0.1.1 (06/07/2022) - remove unneeded prototypes
     v. 0.2.0 (06/08/2022) - add support for commands and format definitions
+    v. 0.2.1 (07/27/2022) - additional formatting
 
     Copyright (c) 2022 Sriranga R. Veeraraghavan <ranga@calalum.org>
 
@@ -78,6 +79,25 @@ enum
 static const char *gPgmOpts = "c:d:hl";
 static const char *gPgmName = "xdict";
 static const char *gPgmOptListDicts = "?";
+
+/* text replacements for formatted definitions */
+
+static const NSDictionary *gReplacements =
+@{
+    @".verb":         @".\nverb ",
+    @"PHRASES":       @"\nPHRASES\n ",
+    @"PHRASAL VERBS": @"\nPHRASAL VERBS\n ",
+    @"DERIVATIVES":   @"\nDERIVATIVES\n ",
+    @"ORIGIN":        @"\nORIGIN\n ",
+    @"IDIOME":        @"\nIDIOME\n ",
+    @"WORD LINKS":    @"\nWORD LINKS\n ",
+    @" | )":          @")",
+    @"“":             @"\"",
+    @"”":             @"\"",
+    @"’":             @"'",
+    @"‘":             @"'",
+    @"—":             @"-"
+};
 
 /* commands */
 
@@ -160,7 +180,7 @@ static bool isArg(const char *arg,
 }
 
 
-/* 
+/*
     listDictionaries - list all available dictionaries
 
     TODO: Use short names for sorting before long names
@@ -268,13 +288,15 @@ static int listDictionaries(void)
 static void printFormattedDefinition(NSString *definition)
 {
     NSMutableString *formattedDef = nil;
+    id origStr;
+    NSEnumerator *replEnumerator = nil;
 
     if (definition == nil)
     {
         return;
     }
 
-    formattedDef = 
+    formattedDef =
         [[definition stringByReplacingOccurrencesOfString: @" 1 "
                                                withString: @"\n  1 "]
         mutableCopy];
@@ -287,11 +309,10 @@ static void printFormattedDefinition(NSString *definition)
         return;
     }
 
-
     if (@available(macos 10.7, *))
     {
         NSError *error = nil;
-        NSRegularExpression *regex = [NSRegularExpression 
+        NSRegularExpression *regex = [NSRegularExpression
             regularExpressionWithPattern: @"([▸•●] )"
                                  options: 0
                                    error: &error];
@@ -299,103 +320,69 @@ static void printFormattedDefinition(NSString *definition)
         {
             [regex replaceMatchesInString: formattedDef
                                   options: NSMatchingWithTransparentBounds
-                                    range: NSMakeRange(0, 
+                                    range: NSMakeRange(0,
                                            [formattedDef length])
                              withTemplate: @"\n    $1"];
         }
 
-        regex = [NSRegularExpression 
-            regularExpressionWithPattern: 
-    //                                    @"([\\)\\.]+)\\s+(\\d+)\\s"
-                @"\\s+(\\d+\\s[\\[\\[\\(])"
+        regex = [NSRegularExpression
+            regularExpressionWithPattern: @"\\s+(\\d+\\s[\\[\\[\\(])"
                                  options: 0
                                    error: &error];
         if (regex != nil)
         {
             [regex replaceMatchesInString: formattedDef
-                                  options: 
+                                  options:
                                   NSMatchingWithTransparentBounds
-                                    range: NSMakeRange(0, 
+                                    range: NSMakeRange(0,
                                            [formattedDef length])
                              withTemplate: @"\n  $1"];
         }
 
-        regex = [NSRegularExpression 
+        regex = [NSRegularExpression
             regularExpressionWithPattern: @"(\\D)\\.\\s(\\S)"
                                  options: NSRegularExpressionCaseInsensitive
                     error: &error];
         if (regex != nil)
         {
             [regex replaceMatchesInString: formattedDef
-                                  options: 
+                                  options:
                                   NSMatchingWithTransparentBounds
-                                    range: NSMakeRange(0, 
+                                    range: NSMakeRange(0,
                                            [formattedDef length])
                              withTemplate: @"$1.\n  $2"];
         }
 
-        regex = [NSRegularExpression 
+        regex = [NSRegularExpression
             regularExpressionWithPattern: @"Word Links sections.*\\."
                                  options: 0
                     error: &error];
         if (regex != nil)
         {
             [regex replaceMatchesInString: formattedDef
-                                  options: 
+                                  options:
                                   NSMatchingWithTransparentBounds
-                                    range: NSMakeRange(0, 
+                                    range: NSMakeRange(0,
                                            [formattedDef length])
                              withTemplate: @"\n"];
         }
     }
 
-    [formattedDef replaceOccurrencesOfString: @".verb"
-                                  withString: @".\nverb "
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
-
-    [formattedDef replaceOccurrencesOfString: @"PHRASES"
-                                  withString: @"\nPHRASES\n "
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
-
-    [formattedDef replaceOccurrencesOfString: @"PHRASAL VERBS"
-                                  withString: @"\nPHRASAL VERBS\n "
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
-
-    [formattedDef replaceOccurrencesOfString: @"DERIVATIVES"
-                                  withString: @"\nDERIVATIVES\n "
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
-
-    [formattedDef replaceOccurrencesOfString: @"ORIGIN"
-                                  withString: @"\nORIGIN\n "
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
-
-    [formattedDef replaceOccurrencesOfString: @"IDIOME"
-                                  withString: @"\nIDIOME\n "
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
-
-    [formattedDef replaceOccurrencesOfString: @"WORD LINKS"
-                                  withString: @"\nWORD LINKS\n "
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
-
-    [formattedDef replaceOccurrencesOfString: @" | )"
-                                  withString: @")"
-                                     options: NSLiteralSearch
-                                       range: NSMakeRange(0, 
-                                       [formattedDef length])];
+    replEnumerator = [gReplacements keyEnumerator];
+    if (replEnumerator != nil)
+    {
+        origStr = [replEnumerator nextObject];
+        while (origStr != nil && [formattedDef length] > 0)
+        {
+            [formattedDef replaceOccurrencesOfString: origStr
+                                          withString:
+                                            [gReplacements objectForKey:origStr]
+                                             options: NSLiteralSearch
+                                               range: NSMakeRange(0,
+                                               [formattedDef length])];
+            origStr = [replEnumerator nextObject];
+        }
+    }
 
     fprintf(stdout,
             "%s\n",
@@ -431,18 +418,9 @@ static int printDefinition(const char *rawWord,
 
     if (opts != NULL)
     {
-        if (opts->headwordOnly == true)
-        {
-            printHeadword = true;
-        }
-        else if (opts->html == true)
-        {
-            printHtml = true;
-        }
-        else if (opts->raw == true)
-        {
-            printRaw = true;
-        }
+        printHeadword = opts->headwordOnly;
+        printHtml = opts->html;
+        printRaw = opts->raw;
     }
 
     wordStr = [[NSString alloc] initWithCString: rawWord
@@ -472,7 +450,24 @@ static int printDefinition(const char *rawWord,
             NULL,
             (__bridge CFStringRef)trimmedWord,
             CFRangeMake(0, (CFIndex)[trimmedWord length]));
-        printFormattedDefinition(definition);
+
+        if (definition == nil)
+        {
+            return ret;
+        }
+
+        if (printRaw == true)
+        {
+            fprintf(stdout,
+                    "%s\n",
+                    [definition cStringUsingEncoding:
+                        NSUTF8StringEncoding]);
+        }
+        else
+        {
+            printFormattedDefinition(definition);
+        }
+
         return 0;
     }
 
@@ -714,7 +709,10 @@ int main(int argc, char * const argv[])
                 break;
 
             default:
-                fprintf(stderr, "Unknown option: '%c'\n", ch);
+                if (ch != '?')
+                {
+                    fprintf(stderr, "Unknown option: '%c'\n", ch);
+                }
                 err++;
                 break;
         }

@@ -1,7 +1,7 @@
 README
 ------
 
-xdict v0.2.0
+xdict v0.2.1
 
 Homepage:
 
@@ -30,7 +30,8 @@ Usage:
                         (by default xdict tries to format the 
                          definition)
 
-    The -c option is ignored unless -d is also specified.
+    The all commands except for 'r' or 'raw' are ignored by the
+    -c option unless -d is also specified.
 
 Build:
 
@@ -71,6 +72,7 @@ Dependencies:
 
 History:
 
+    v. 0.2.1 - additional formatting support
     v. 0.2.0 - add commands and format definitions
     v. 0.1.0 - initial release
 
