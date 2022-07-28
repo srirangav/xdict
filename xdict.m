@@ -57,16 +57,67 @@ extern CFStringRef DCSRecordCopyData(CFTypeRef record);
 extern CFStringRef DCSRecordGetHeadword(CFTypeRef record);
 extern CFStringRef DCSRecordGetRawHeadword(CFTypeRef record);
 
-/* xdict options */
-
-typedef struct
-{
-    bool headwordOnly;
-    bool html;
-    bool raw;
-} xdictOpts_t;
-
 /* globals */
+
+/* text replacements for formatted definitions */
+
+static const NSDictionary *gFixedReplacements =
+@{
+    @".verb":            @".\n  verb",
+    @" verb\n":          @"\n  verb\n",
+    @" verb ":           @" verb\n  ",
+    @".noun":            @".\n  noun",
+    @" noun\n":          @"\n  noun\n",
+    @" noun ":           @" noun\n  ",
+    @".adverb":          @".\n  adverb",
+    @" adverb\n":        @"\n  adverb\n",
+    @" adverb ":         @" adverb\n  ",
+    @".adjective":       @".\n  adjective",
+    @" adjective\n":     @"\n  adjective\n",
+    @" adjective ":      @" adjective\n  ",
+    @".preposition":     @".\n  preposition",
+    @" preposition\n":   @"\n  preposition\n",
+    @" preposition ":    @" preposition\n  ",
+    @".conjunction":     @".\n  conjunction",
+    @" conjunction\n":   @"\n  conjunction\n",
+    @" conjunction ":    @" conjunction\n  ",
+    @"PHRASES":          @"\nPHRASES\n ",
+    @"PHRASAL VERBS":    @"\nPHRASAL VERBS\n ",
+    @"DERIVATIVES":      @"\nDERIVATIVES\n ",
+    @"ORIGIN":           @"\nORIGIN\n ",
+    @"IDIOME":           @"\nIDIOME\n ",
+    @"WORD LINKS":       @"\nWORD LINKS\n ",
+    @" | )":             @")",
+    @": |":              @" |",
+    @" |\n":             @"\n",
+    @"“":                @"\"",
+    @"”":                @"\"",
+    @"’":                @"'",
+    @"‘":                @"'",
+    @"—":                @"-",
+};
+
+/*
+    command line options
+
+        -c [cmd]  - execute the specified command, where command
+                    is one of:
+
+                    'h' / 'headword' - display the headword
+                    'm' / 'html'     - display the definition in
+                                       html, if available
+                    'r' / 'raw'      - do not perform formatting
+                                       for the definition.
+
+                    The headword and html commands are only
+                    available if a dictionary is specified
+                    using the -d option.
+
+        -d [dict] - look up the specified word in the requested
+                    dictionary
+
+        -l        - list the available dictionaries
+*/
 
 enum
 {
@@ -80,33 +131,21 @@ static const char *gPgmOpts = "c:d:hl";
 static const char *gPgmName = "xdict";
 static const char *gPgmOptListDicts = "?";
 
-/* text replacements for formatted definitions */
-
-static const NSDictionary *gReplacements =
-@{
-    @".verb":         @".\nverb ",
-    @"PHRASES":       @"\nPHRASES\n ",
-    @"PHRASAL VERBS": @"\nPHRASAL VERBS\n ",
-    @"DERIVATIVES":   @"\nDERIVATIVES\n ",
-    @"ORIGIN":        @"\nORIGIN\n ",
-    @"IDIOME":        @"\nIDIOME\n ",
-    @"WORD LINKS":    @"\nWORD LINKS\n ",
-    @" | )":          @")",
-    @"“":             @"\"",
-    @"”":             @"\"",
-    @"’":             @"'",
-    @"‘":             @"'",
-    @"—":             @"-"
-};
-
 /* commands */
 
-static const char *gPgmCmdHeadwordLong = "headword";
+static const char *gPgmCmdHeadwordLong  = "headword";
 static const char *gPgmCmdHeadwordShort = "h";
-static const char *gPgmCmdHtmlLong = "html";
-static const char *gPgmCmdHtmlShort = "m";
-static const char *gPgmCmdRawLong = "raw";
-static const char *gPgmCmdRawShort = "r";
+static const char *gPgmCmdHtmlLong      = "html";
+static const char *gPgmCmdHtmlShort     = "m";
+static const char *gPgmCmdRawLong       = "raw";
+static const char *gPgmCmdRawShort      = "r";
+
+typedef struct
+{
+    bool headwordOnly;
+    bool html;
+    bool raw;
+} xdictOpts_t;
 
 /* prototypes */
 
@@ -301,7 +340,7 @@ static void printFormattedDefinition(NSString *definition)
                                                withString: @"\n  1 "]
         mutableCopy];
 
-    if (formattedDef == nil)
+    if (formattedDef == nil || [formattedDef length] <= 0)
     {
         fprintf(stdout,
                 "%s\n",
@@ -312,10 +351,35 @@ static void printFormattedDefinition(NSString *definition)
     if (@available(macos 10.7, *))
     {
         NSError *error = nil;
-        NSRegularExpression *regex = [NSRegularExpression
-            regularExpressionWithPattern: @"([▸•●] )"
-                                 options: 0
-                                   error: &error];
+        NSRegularExpression *regex = nil;
+
+        regex = [NSRegularExpression regularExpressionWithPattern: @": \\)([.,])"
+                                                          options: 0
+                                                            error: &error];
+        if (regex != nil)
+        {
+            [regex replaceMatchesInString: formattedDef
+                                  options: NSMatchingWithTransparentBounds
+                                    range: NSMakeRange(0,
+                                           [formattedDef length])
+                             withTemplate: @"\\)$1"];
+        }
+
+        regex = [NSRegularExpression regularExpressionWithPattern: @" (\\d+) "
+                                                          options: 0
+                                                            error: &error];
+        if (regex != nil)
+        {
+            [regex replaceMatchesInString: formattedDef
+                                  options: NSMatchingWithTransparentBounds
+                                    range: NSMakeRange(0,
+                                           [formattedDef length])
+                             withTemplate: @"\n  $1 "];
+        }
+
+        regex = [NSRegularExpression regularExpressionWithPattern: @"([▸•●■] )"
+                                                          options: 0
+                                                            error: &error];
         if (regex != nil)
         {
             [regex replaceMatchesInString: formattedDef
@@ -366,9 +430,10 @@ static void printFormattedDefinition(NSString *definition)
                                            [formattedDef length])
                              withTemplate: @"\n"];
         }
+
     }
 
-    replEnumerator = [gReplacements keyEnumerator];
+    replEnumerator = [gFixedReplacements keyEnumerator];
     if (replEnumerator != nil)
     {
         origStr = [replEnumerator nextObject];
@@ -376,7 +441,8 @@ static void printFormattedDefinition(NSString *definition)
         {
             [formattedDef replaceOccurrencesOfString: origStr
                                           withString:
-                                            [gReplacements objectForKey:origStr]
+                                            [gFixedReplacements
+                                                objectForKey: origStr]
                                              options: NSLiteralSearch
                                                range: NSMakeRange(0,
                                                [formattedDef length])];
