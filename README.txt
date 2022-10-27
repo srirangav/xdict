@@ -78,7 +78,8 @@ History:
 
 Platforms:
 
-    xdict has been tested on MacOSX 11 (BigSur) on M1.  
+    xdict has been tested on MacOSX 11 (BigSur) and 12 (Monterey)
+    on M1.
 
 License:
 
